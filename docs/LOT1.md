@@ -6,6 +6,7 @@ Depuis la racine du dépôt, avec Node.js 24 et Docker :
 
 ```sh
 cp .env.example .env
+# Configurer JWT_SECRET avec une clé aléatoire : voir README.md.
 docker compose up -d db
 npm ci
 npm run db:generate
@@ -31,7 +32,7 @@ le workspace API. Les variables déjà présentes dans l'environnement ont prior
 
 ## Migrations et contraintes
 
-Prisma 6 est utilisé pour rester compatible avec le socle Node.js 20.
+Prisma 6 est la version du schéma et des migrations ; le projet utilise Node.js 24.
 Les index partiels et CHECK sont conservés dans le SQL de la migration,
 selon la [documentation Prisma 6](https://docs.prisma.io/docs/orm/v6/prisma-migrate/workflows/unsupported-database-features).
 Ne pas remplacer les migrations par `prisma db push` : ces contraintes SQL
@@ -59,6 +60,8 @@ docker run --rm -d --name naturo-lot1-test \
   -e POSTGRES_USER=naturo -e POSTGRES_PASSWORD=naturo \
   -e POSTGRES_DB=naturo_test -p 127.0.0.1:55432:5432 postgres:16-alpine
 export DATABASE_URL=postgresql://naturo:naturo@localhost:55432/naturo_test
+export JWT_SECRET=test-only-secret-with-at-least-32-bytes
+# Cette clé est réservée à la base locale de tests.
 docker exec -i naturo-lot1-test psql -U naturo -d naturo_test -v ON_ERROR_STOP=1 < api/tests/fixtures/database-roles.sql
 npm run db:migrate
 npm run lint
