@@ -209,3 +209,10 @@ Statuts : ⬜ À faire · 🟨 En cours · ✅ Terminé
 - Runtime aligné sur Node 24 dans le dépôt, la CI, Docker et Vercel.
 - 32 tests API réussis, également dans Docker Node 24 ; connexion réelle Supabase vérifiée.
 - React Router 7.18.5 et le lockfile installés sur feature/lot-2-auth (2357fd9), sans modifier le front de Claude.
+
+### Staging opérationnel — 2026-11-13
+
+- PR #5 fusionnée dans dev, CI et déploiement Vercel verts.
+- URL : https://courscicd-git-dev-projet-ci-cd.vercel.app (authentification Vercel conservée).
+- Smoke tests réels : /api/health répond 200 avec status=ok et db=ok ; page d'accueil 200.
+- Accès temporaire de validation révoqué après les vérifications.
