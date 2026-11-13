@@ -1,6 +1,7 @@
 {
   "name": "naturo-rdv",
   "private": true,
+  "type": "module",
   "workspaces": ["api", "web"],
   "scripts": {
     "dev": "npm run dev --workspaces --if-present",
