@@ -18,7 +18,7 @@ Projet réalisé dans le cadre du cours CI/CD : l'accent est mis sur le découpa
 | Couche | Technologie |
 |---|---|
 | Front | React + Vite |
-| API | Node.js 20 + Express |
+| API | Node.js 24 + Express |
 | Base de données | PostgreSQL 16 (ORM Prisma) |
 | Tests | Vitest, Supertest |
 | Qualité | ESLint, Prettier |

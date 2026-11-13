@@ -187,3 +187,32 @@ Statuts : ⬜ À faire · 🟨 En cours · ✅ Terminé
 ### Journal
 
 - 
+
+## Reprise du staging avec Supabase — 2026-11-13
+
+- Branche feature/staging-supabase créée depuis dev.
+- Serveur MCP Supabase configuré pour bognyfqwmkiuxyyzxlie et OAuth confirmé.
+- DIRECT_URL réservée au CLI Prisma, DATABASE_URL conservée pour l'API.
+- Client Prisma généré à l'installation et moteur Vercel inclus dans le bundle.
+- Migrations automatiques limitées à dev/Preview ; autres branches inchangées.
+- RLS activée sur les tables applicatives pour bloquer les accès publics Supabase.
+- 31 tests API, lint sans erreur, build web, simulation du build staging et Docker validés.
+- À terminer : charger les outils MCP dans la session, connecter Vercel, inspecter
+  Supabase, définir les variables de staging et vérifier le déploiement distant.
+
+### Raccordement Supabase effectué — 2026-11-13
+
+- Base de staging initialisée : users, appointments, closed_days et registre Prisma.
+- Trois migrations applicatives à jour ; rôle migrateur limité au schéma public.
+- Rôle applicatif distinct, sans DDL ni accès au registre des migrations ; RLS et ACL vérifiées.
+- DATABASE_URL, DIRECT_URL et JWT_SECRET enregistrés comme secrets Vercel pour Preview/dev uniquement.
+- Runtime aligné sur Node 24 dans le dépôt, la CI, Docker et Vercel.
+- 32 tests API réussis, également dans Docker Node 24 ; connexion réelle Supabase vérifiée.
+- React Router 7.18.5 et le lockfile installés sur feature/lot-2-auth (2357fd9), sans modifier le front de Claude.
+
+### Staging opérationnel — 2026-11-13
+
+- PR #5 fusionnée dans dev, CI et déploiement Vercel verts.
+- URL : https://courscicd-git-dev-projet-ci-cd.vercel.app (authentification Vercel conservée).
+- Smoke tests réels : /api/health répond 200 avec status=ok et db=ok ; page d'accueil 200.
+- Accès temporaire de validation révoqué après les vérifications.

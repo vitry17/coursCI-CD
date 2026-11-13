@@ -1,94 +1,140 @@
-# Staging & déploiement (Vercel)
+# Staging Vercel + Supabase
 
-Ce document décrit comment le projet **naturo-rdv** est déployé, avec un
-environnement de **staging** (recette) distinct de la **production**.
+## Environnements
 
-## Principe : CI ≠ CD
+- Dépôt : vitry17/coursCI-CD.
+- Projet Vercel : courscicd, équipe projet-ci-cd.
+- Projet Supabase de staging : bognyfqwmkiuxyyzxlie (pooler eu-central-1).
+- dev : Preview Vercel de staging ; main : production.
+- Les branches feature/* ont des previews sans accès à la base partagée.
+- Node 24 est fixé dans package.json, .nvmrc, la CI, Docker et Vercel.
+  [Versions prises en charge par Vercel](https://vercel.com/docs/functions/runtimes/node-js/node-js-versions).
 
-On sépare les deux rôles pour ne rien dupliquer :
+React est servi depuis web/dist ; Express via api/index.js.
+Le front appelle /api/* sur la même origine, sans clé Supabase publique.
 
-| Outil              | Rôle | Quand                              |
-| ------------------ | ---- | ---------------------------------- |
-| **GitHub Actions** | CI   | lint + tests + build de vérif      |
-| **Vercel**         | CD   | déploie automatiquement à chaque push |
+## Connexions et secrets
 
-> GitHub Actions ne déploie rien, Vercel ne relit pas la qualité du code.
-> GitHub = qualité du code, Vercel = livraison.
+| Variable | Usage | Rôle PostgreSQL | Pooler |
+| --- | --- | --- | --- |
+| DATABASE_URL | API Express | naturo_app | Transaction, 6543 |
+| DIRECT_URL | Prisma Migrate | naturo_migrator | Session, 5432 |
+| JWT_SECRET | Authentification du lot 2 | — | Secret propre au staging |
 
-GitHub Actions est **gratuit** ici car le dépôt est **public** (runners
-standard illimités). Vercel est utilisé en plan **Hobby** (gratuit,
-usage non-commercial — OK pour un projet d'école).
+Ces trois variables sont des secrets Vercel limités à Preview / branche dev.
+Aucune variable de production n'a été définie.
 
-## Modèle de branches → environnements
+Les identifiants locaux sont dans .env.staging, ignoré par Git et les builds Docker.
+Ne jamais afficher ni commiter ce fichier. Il n'est pas chargé automatiquement :
+les commandes locales habituelles continuent d'utiliser .env.
 
-| Branche      | Environnement Vercel     | URL                                   |
-| ------------ | ------------------------ | ------------------------------------- |
-| `main`       | **Production**           | URL stable de prod                    |
-| `dev`        | **Staging** (preview)    | URL stable de staging                 |
-| `feature/*`  | **Preview** (éphémère)   | 1 URL générée automatiquement par PR  |
+Exemple de structure uniquement :
 
-Flux : `feature/*` → PR (preview + CI verte) → merge dans `dev` (staging) →
-merge `dev` → `main` (production).
+```dotenv
+DATABASE_URL=postgresql://naturo_app.bognyfqwmkiuxyyzxlie:PASSWORD@aws-1-eu-central-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require
+DIRECT_URL=postgresql://naturo_migrator.bognyfqwmkiuxyyzxlie:PASSWORD@aws-1-eu-central-1.pooler.supabase.com:5432/postgres?sslmode=require
+```
 
-## Architecture de déploiement (Pattern A : tout sur Vercel)
+Le script Prisma privilégie DIRECT_URL pour les migrations et utilise DATABASE_URL
+en l'absence de DIRECT_URL (local et CI). Le client API utilise DATABASE_URL.
 
-Le front (Vite/React) **et** l'API (Express) sont servis par **un seul projet
-Vercel**, sur la **même origine** :
+Références : [connexion Supabase](https://supabase.com/docs/guides/database/connecting-to-postgres)
+et [Prisma avec Supabase](https://supabase.com/docs/guides/database/prisma).
 
-- le front statique est servi depuis `web/dist` ;
-- l'API Express tourne en **fonction serverless** via `api/index.js`, exposée
-  sous `/api/*`.
+## Droits et isolation
 
-Tout est configuré dans [`vercel.json`](../vercel.json) :
+- naturo_migrator possède les tables et types applicatifs, et peut créer des
+  objets dans public. Il ne peut créer ni bases, ni rôles, ni nouveaux schémas.
+- naturo_app peut lire, insérer, modifier et supprimer dans users, appointments
+  et closed_days. Il ne possède aucune table et ne peut pas exécuter de DDL.
+- Aucun des deux comptes n'est superutilisateur et aucun ne possède BYPASSRLS.
+- RLS est activée sur les quatre tables, y compris _prisma_migrations.
+- Les policies des trois tables applicatives autorisent uniquement le rôle
+  serveur naturo_app. Ce rôle n'est attribué ni à anon ni à authenticated.
+- Les rôles publics n'ont aucun accès aux tables. L'autorisation des patients
+  et des administrateurs reste gérée par Express, dans le lot 2.
+- L'API ne peut pas lire ni modifier _prisma_migrations.
 
-- `@vercel/static-build` construit `web/` → `web/dist` ;
-- `@vercel/node` empaquette `api/index.js` (qui réutilise `api/src/app.js`) ;
-- les `routes` envoient `/api/*` vers la fonction, le reste vers le front.
+Les mots de passe des rôles ont été générés aléatoirement. Les opérations de
+provisionnement n'ont transmis que leurs vérificateurs SCRAM à PostgreSQL.
 
-Comme front et API partagent la même origine, **aucune variable `VITE_API_URL`
-n'est nécessaire** et **CORS est inutile** entre les deux : le front appelle
-simplement `/api/...` (voir `web/src/App.jsx` qui lit `/api/health`). Le proxy
-Vite (`web/vite.config.js`) fait la même chose en local.
+## Migrations et build
 
-## Mise en place côté Vercel (à faire une fois, dans le dashboard)
+1. Le builder statique part du package.json racine pour installer les deux workspaces.
+   npm postinstall génère le client Prisma ; la sortie statique est web/dist.
+2. Le moteur rhel-openssl-3.0.x est inclus dans la fonction Vercel.
+3. Le script vercel-build applique prisma migrate deploy uniquement pour
+   VERCEL=1, VERCEL_ENV=preview et VERCEL_GIT_COMMIT_REF=dev.
+4. DIRECT_URL est obligatoire dans ce cas ; une erreur de migration arrête le build.
+5. Les previews feature/* et la production ne lancent pas ces migrations.
+6. Vite construit le front.
 
-Ces étapes se font sur https://vercel.com (je ne peux pas les faire à ta place) :
+Migrations applicatives installées :
+- 20261113000000_init : modèle et contraintes ;
+- 20261113010000_enable_rls : activation RLS ;
+- 20261113020000_server_access : droits du serveur et protection du registre Prisma.
 
-1. **Add New… → Project** → importer le dépôt `vitry17/coursCI-CD`.
-2. **Root Directory** : laisser la **racine du dépôt** (c'est `vercel.json` qui
-   pilote le build, pas un sous-dossier).
-3. **Framework Preset** : `Other` (la config vient de `vercel.json`).
-4. **Settings → Git → Production Branch** : `main`.
-5. **Deploy**. Vercel crée l'URL de production (branche `main`) et génère une
-   URL de preview pour chaque autre branche / PR.
+Ne pas utiliser prisma db push ou migrate reset sur Supabase.
 
-### Variables d'environnement
+### Initialisation d'une nouvelle base avec un rôle restreint
 
-À définir dans **Settings → Environment Variables**, en les **cloisonnant par
-environnement** (Production vs Preview) — ne jamais mettre les secrets de prod
-en staging :
+Le provisionnement des rôles est une opération d'administration distincte.
+Ne jamais ajouter leurs mots de passe aux migrations.
 
-| Variable        | Prod | Preview/Staging | Remarque                               |
-| --------------- | ---- | --------------- | -------------------------------------- |
-| `DATABASE_URL`  | ✅   | ✅ (autre base) | quand une vraie base sera branchée     |
-| `JWT_SECRET`    | ✅   | ✅ (différent)  | secret distinct par environnement      |
-| `CORS_ORIGIN`   | —    | —               | inutile en Pattern A (same-origin)     |
+Sur ce projet, public existait déjà. L'instruction CREATE SCHEMA IF NOT EXISTS
+de la migration initiale exigeait un privilège de niveau base non accordé au
+migrateur. Le SQL initial a donc été exécuté via l'administration Supabase dans
+public, sous le rôle naturo_migrator, en omettant uniquement cette instruction
+déjà satisfaite. La migration a ensuite été enregistrée avec
+prisma migrate resolve --applied 20261113000000_init. Les deux suivantes ont été
+appliquées normalement avec Prisma. Le registre conserve les tentatives échouées
+comme annulées ; il n'y a aucune migration non résolue.
 
-Tant que l'API n'a que `/api/health`, aucune variable n'est obligatoire.
+Les prochains déploiements utilisent simplement migrate deploy.
 
-## Tester que ça marche
+## Vérifications
 
-- **En local** : `npm run dev` (lance front + API), ouvrir http://localhost:5173
-  → la page doit afficher « API : ok » (le front appelle `/api/health` via le
-  proxy Vite).
-- **En preview/staging** : ouvrir l'URL Vercel de la branche → même affichage
-  « API : ok », ce qui prouve que la fonction serverless répond.
-- **Endpoint direct** : `https://<url-vercel>/api/health` doit renvoyer
-  `{"status":"ok"}`.
+Depuis api/, avec Node 24 :
 
-## Évolutions possibles
+```sh
+node --env-file=../.env.staging scripts/prisma.js migrate status
+```
 
-- Ajouter un test front (Vitest) sur le composant `App` (ex. mock de `fetch`).
-- Si l'API devient un vrai serveur long-running (websockets, jobs), envisager
-  le **Pattern B** : front sur Vercel + API conteneurisée (le `Dockerfile`
-  existe déjà) sur un hébergeur dédié.
+Après déploiement :
+
+```sh
+curl --fail https://URL-STAGING/api/health
+```
+
+Réponse attendue : HTTP 200 et {"status":"ok","db":"ok"}.
+Un HTTP 503 indique une connexion DB indisponible.
+Le healthcheck vérifie la connexion ; les logs du build attestent les migrations.
+
+La CI utilise exclusivement PostgreSQL éphémère. Avant les migrations, elle crée
+les rôles sans login définis dans api/tests/fixtures/database-roles.sql.
+Les tests vérifient les contraintes, le CRUD serveur, l'absence d'accès public,
+l'interdiction du DDL et la protection du registre Prisma.
+
+## État vérifié le 13 novembre 2026
+
+- Tables créées dans Supabase ; trois migrations applicatives à jour.
+- Connexion réelle du rôle naturo_app testée, base encore sans patients.
+- 32 tests API réussis ; build web réussi.
+- Aucun avertissement ni erreur de sécurité Supabase. Deux informations attendues :
+  registre Prisma sans policy publique, et index encore inutilisé sur une base vide.
+  [RLS sans policy](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy),
+  [index inutilisé](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index).
+- Aucun compte administrateur par défaut : le seed nécessite un email et un
+  mot de passe choisis explicitement et ne s'exécute jamais pendant le build.
+## Déploiement distant validé
+
+La PR #5 a été fusionnée dans dev (8eac434), avec CI et build Vercel verts.
+URL stable : https://courscicd-git-dev-projet-ci-cd.vercel.app
+
+Le 13 novembre 2026, tests HTTP authentifiés sur le déploiement de dev :
+- /api/health : HTTP 200, {"status":"ok","db":"ok"} ;
+- / : HTTP 200, page HTML React présente.
+
+La preview conserve Vercel Authentication : sans session Vercel, l'URL redirige
+vers la connexion. L'accès temporaire de vérification a été révoqué immédiatement
+après les tests. Aucun accès public ni contournement permanent n'a été ajouté.

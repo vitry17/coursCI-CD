@@ -7,7 +7,7 @@ const result = spawnSync(
   [require.resolve('prisma/build/index.js'), ...process.argv.slice(2)],
   {
     stdio: 'inherit',
-    env: process.env,
+    env: { ...process.env, DATABASE_URL: process.env.DIRECT_URL || process.env.DATABASE_URL },
   }
 );
 if (result.error) console.error(result.error.message);
