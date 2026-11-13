@@ -1,102 +1,127 @@
 # Staging Vercel + Supabase
 
-## État et architecture
+## Environnements
 
 - Dépôt : vitry17/coursCI-CD.
-- Projet Vercel existant : courscicd, équipe projet-ci-cd.
-- Projet Supabase choisi pour le staging : bognyfqwmkiuxyyzxlie.
-- main correspond à la production ; dev au staging (Preview Vercel).
-- Les branches feature/* ont des previews indépendantes.
-- React est servi depuis web/dist ; Express via api/index.js.
-- Le front appelle /api/health sur la même origine, sans clé Supabase publique.
-- Prisma reste le seul accès aux tables applicatives depuis le serveur.
+- Projet Vercel : courscicd, équipe projet-ci-cd.
+- Projet Supabase de staging : bognyfqwmkiuxyyzxlie (pooler eu-central-1).
+- dev : Preview Vercel de staging ; main : production.
+- Les branches feature/* ont des previews sans accès à la base partagée.
+- Node 24 est fixé dans package.json, .nvmrc, la CI, Docker et Vercel.
+  [Versions prises en charge par Vercel](https://vercel.com/docs/functions/runtimes/node-js/node-js-versions).
 
-Le serveur MCP Supabase sert à administrer le projet. Son authentification OAuth
-ne configure pas la connexion PostgreSQL utilisée par l'application.
+React est servi depuis web/dist ; Express via api/index.js.
+Le front appelle /api/* sur la même origine, sans clé Supabase publique.
 
-## Connexions Supabase
+## Connexions et secrets
 
-Dans Supabase → Connect, récupérer les deux URL du projet :
+| Variable | Usage | Rôle PostgreSQL | Pooler |
+| --- | --- | --- | --- |
+| DATABASE_URL | API Express | naturo_app | Transaction, 6543 |
+| DIRECT_URL | Prisma Migrate | naturo_migrator | Session, 5432 |
+| JWT_SECRET | Authentification du lot 2 | — | Secret propre au staging |
 
-| Variable | Usage | Connexion |
-| --- | --- | --- |
-| DATABASE_URL | API serverless | Transaction pooler, port 6543 |
-| DIRECT_URL | Migrations Prisma | Session pooler, port 5432 |
+Ces trois variables sont des secrets Vercel limités à Preview / branche dev.
+Aucune variable de production n'a été définie.
 
-Exemples de structure (remplacer HOST par l'hôte exact affiché dans Supabase,
-ne pas deviner la région ; encoder les caractères spéciaux du mot de passe) :
+Les identifiants locaux sont dans .env.staging, ignoré par Git et les builds Docker.
+Ne jamais afficher ni commiter ce fichier. Il n'est pas chargé automatiquement :
+les commandes locales habituelles continuent d'utiliser .env.
+
+Exemple de structure uniquement :
 
 ```dotenv
-DATABASE_URL=postgresql://postgres.bognyfqwmkiuxyyzxlie:PASSWORD@HOST:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require
-DIRECT_URL=postgresql://postgres.bognyfqwmkiuxyyzxlie:PASSWORD@HOST:5432/postgres?sslmode=require
+DATABASE_URL=postgresql://naturo_app.bognyfqwmkiuxyyzxlie:PASSWORD@aws-1-eu-central-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require
+DIRECT_URL=postgresql://naturo_migrator.bognyfqwmkiuxyyzxlie:PASSWORD@aws-1-eu-central-1.pooler.supabase.com:5432/postgres?sslmode=require
 ```
 
-Le pooler session est utilisable en IPv4 pour les migrations.
-Le script Prisma utilise DIRECT_URL si elle est définie, sinon DATABASE_URL
-pour rester compatible avec PostgreSQL local et la CI.
-Le client API continue d'utiliser DATABASE_URL.
+Le script Prisma privilégie DIRECT_URL pour les migrations et utilise DATABASE_URL
+en l'absence de DIRECT_URL (local et CI). Le client API utilise DATABASE_URL.
 
-Références : [Supabase / Prisma](https://www.prisma.io/docs/orm/v6/overview/databases/supabase)
-et [diagnostic Supabase Prisma](https://supabase.com/docs/guides/database/prisma/prisma-troubleshooting).
+Références : [connexion Supabase](https://supabase.com/docs/guides/database/connecting-to-postgres)
+et [Prisma avec Supabase](https://supabase.com/docs/guides/database/prisma).
 
-## Configuration Vercel
+## Droits et isolation
 
-Dans le projet existant, conserver la racine du dépôt et main comme branche
-de production. Définir DATABASE_URL et DIRECT_URL pour **Preview, branche dev**.
-Ne pas réutiliser ces secrets pour la production ou les previews des autres branches.
+- naturo_migrator possède les tables et types applicatifs, et peut créer des
+  objets dans public. Il ne peut créer ni bases, ni rôles, ni nouveaux schémas.
+- naturo_app peut lire, insérer, modifier et supprimer dans users, appointments
+  et closed_days. Il ne possède aucune table et ne peut pas exécuter de DDL.
+- Aucun des deux comptes n'est superutilisateur et aucun ne possède BYPASSRLS.
+- RLS est activée sur les quatre tables, y compris _prisma_migrations.
+- Les policies des trois tables applicatives autorisent uniquement le rôle
+  serveur naturo_app. Ce rôle n'est attribué ni à anon ni à authenticated.
+- Les rôles publics n'ont aucun accès aux tables. L'autorisation des patients
+  et des administrateurs reste gérée par Express, dans le lot 2.
+- L'API ne peut pas lire ni modifier _prisma_migrations.
 
-Le dépôt prépare :
-1. npm postinstall génère le client Prisma à chaque installation.
-2. Le moteur rhel-openssl-3.0.x est généré et inclus dans le bundle API.
-3. Le script vercel-build du front applique prisma migrate deploy uniquement
-   lorsque VERCEL=1, VERCEL_ENV=preview et VERCEL_GIT_COMMIT_REF=dev.
-4. Le build staging échoue si DIRECT_URL manque ou si une migration échoue.
-5. Les previews feature/* et la production ne déclenchent pas ces migrations.
+Les mots de passe des rôles ont été générés aléatoirement. Les opérations de
+provisionnement n'ont transmis que leurs vérificateurs SCRAM à PostgreSQL.
+
+## Migrations et build
+
+1. npm postinstall génère le client Prisma.
+2. Le moteur rhel-openssl-3.0.x est inclus dans la fonction Vercel.
+3. Le script vercel-build applique prisma migrate deploy uniquement pour
+   VERCEL=1, VERCEL_ENV=preview et VERCEL_GIT_COMMIT_REF=dev.
+4. DIRECT_URL est obligatoire dans ce cas ; une erreur de migration arrête le build.
+5. Les previews feature/* et la production ne lancent pas ces migrations.
 6. Vite construit le front.
 
-Ne pas utiliser prisma db push ou migrate reset pour initialiser Supabase :
-les migrations SQL versionnées contiennent les CHECK et l'index partiel.
+Migrations applicatives installées :
+- 20261113000000_init : modèle et contraintes ;
+- 20261113010000_enable_rls : activation RLS ;
+- 20261113020000_server_access : droits du serveur et protection du registre Prisma.
 
-Le seed administrateur reste une action explicite, jamais une étape de build.
-Configurer ADMIN_EMAIL et ADMIN_PASSWORD puis lancer npm run db:seed avec la
-connexion du staging uniquement quand la base est prête. Aucun mot de passe
-par défaut n'est créé.
+Ne pas utiliser prisma db push ou migrate reset sur Supabase.
 
-## Accès aux tables
+### Initialisation d'une nouvelle base avec un rôle restreint
 
-La migration 20261113010000_enable_rls active RLS sur les trois tables.
-Aucune policy publique n'est créée : les rôles anon/authenticated de l'API
-Supabase ne peuvent pas lire les patients ni les hachages de mots de passe.
-La connexion Prisma doit utiliser le propriétaire des tables ou un rôle serveur
-autorisé à contourner RLS. Les règles d'authentification de l'application
-restent dans Express (lot 2).
+Le provisionnement des rôles est une opération d'administration distincte.
+Ne jamais ajouter leurs mots de passe aux migrations.
 
-Voir [RLS Supabase](https://supabase.com/docs/guides/database/postgres/row-level-security).
+Sur ce projet, public existait déjà. L'instruction CREATE SCHEMA IF NOT EXISTS
+de la migration initiale exigeait un privilège de niveau base non accordé au
+migrateur. Le SQL initial a donc été exécuté via l'administration Supabase dans
+public, sous le rôle naturo_migrator, en omettant uniquement cette instruction
+déjà satisfaite. La migration a ensuite été enregistrée avec
+prisma migrate resolve --applied 20261113000000_init. Les deux suivantes ont été
+appliquées normalement avec Prisma. Le registre conserve les tentatives échouées
+comme annulées ; il n'y a aucune migration non résolue.
 
-## Validation après déploiement
+Les prochains déploiements utilisent simplement migrate deploy.
+
+## Vérifications
+
+Depuis api/, avec Node 24 :
+
+```sh
+node --env-file=../.env.staging scripts/prisma.js migrate status
+```
+
+Après déploiement :
 
 ```sh
 curl --fail https://URL-STAGING/api/health
 ```
 
-Réponse attendue : HTTP 200 avec {"status":"ok","db":"ok"}.
-HTTP 503 avec {"status":"error","db":"error"} signifie que la connexion DB
-est indisponible. Ce healthcheck vérifie la connexion, pas la présence des tables :
-la réussite de migrate deploy doit aussi être vérifiée dans les logs du build.
+Réponse attendue : HTTP 200 et {"status":"ok","db":"ok"}.
+Un HTTP 503 indique une connexion DB indisponible.
+Le healthcheck vérifie la connexion ; les logs du build attestent les migrations.
 
-La CI GitHub conserve sa propre base PostgreSQL éphémère. Elle n'utilise jamais
-la base Supabase et ne déploie pas sur Vercel.
+La CI utilise exclusivement PostgreSQL éphémère. Avant les migrations, elle crée
+les rôles sans login définis dans api/tests/fixtures/database-roles.sql.
+Les tests vérifient les contraintes, le CRUD serveur, l'absence d'accès public,
+l'interdiction du DDL et la protection du registre Prisma.
 
-## Reprise du raccordement
+## État vérifié le 13 novembre 2026
 
-Le code peut être validé localement sans accès aux comptes externes.
-Pour finaliser le staging, il reste à inspecter le projet Supabase, configurer
-les deux URL dans Vercel, déployer dev puis vérifier le healthcheck distant.
-Ces opérations ne sont pas attestées par une simple authentification MCP.
-## Validation locale du raccordement — 13 novembre 2026
-
-31 tests API réussis, dont l'isolation RLS et le contrôle des migrations par
-branche. Installation npm ci, lint sans erreur, build web et image Docker validés.
-Le build staging a été simulé avec une DATABASE_URL invalide et une DIRECT_URL
-locale valide : migrations et build réussis, confirmant le choix de connexion.
-La base Supabase distante et les variables Vercel restent à configurer.
+- Tables créées dans Supabase ; trois migrations applicatives à jour.
+- Connexion réelle du rôle naturo_app testée, base encore sans patients.
+- 32 tests API réussis ; build web réussi.
+- Aucun avertissement ni erreur de sécurité Supabase. Deux informations attendues :
+  registre Prisma sans policy publique, et index encore inutilisé sur une base vide.
+  [RLS sans policy](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy),
+  [index inutilisé](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index).
+- Aucun compte administrateur par défaut : le seed nécessite un email et un
+  mot de passe choisis explicitement et ne s'exécute jamais pendant le build.
