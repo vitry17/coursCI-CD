@@ -49,7 +49,26 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, []);
 
-  const value = { user, loading, login, register, logout };
+  const updateProfile = useCallback(async (changes) => {
+    const data = await api.updateMe(changes);
+    setUser(data.user);
+    return data.user;
+  }, []);
+
+  const deleteAccount = useCallback(async () => {
+    await api.deleteMe();
+    setUser(null);
+  }, []);
+
+  const value = {
+    user,
+    loading,
+    login,
+    register,
+    logout,
+    updateProfile,
+    deleteAccount,
+  };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
