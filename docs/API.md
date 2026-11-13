@@ -44,6 +44,7 @@ Utilisé par la CI et le déploiement.
 
 ```json
 200 { "status": "ok", "db": "ok" }
+503 { "status": "error", "db": "error" }
 ```
 
 ---

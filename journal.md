@@ -7,7 +7,7 @@ Statuts : ⬜ À faire · 🟨 En cours · ✅ Terminé
 | Lot | Intitulé | Statut | Début | Fin |
 |---|---|---|---|---|
 | 0 | Socle projet et CI | 🟨 En cours | 2026-09-25 | |
-| 1 | Base de données | ⬜ À faire | | |
+| 1 | Base de données | 🟨 Implémenté, à intégrer | 2026-11-13 | |
 | 2 | Authentification | ⬜ À faire | | |
 | 3 | Profil utilisateur | ⬜ À faire | | |
 | 4 | Créneaux et prise de rendez-vous | ⬜ À faire | | |
@@ -56,20 +56,27 @@ Statuts : ⬜ À faire · 🟨 En cours · ✅ Terminé
 
 ## Lot 1 : Base de données
 
-**Statut** : ⬜ À faire
+**Statut** : 🟨 Implémenté et validé localement ; PR et intégration dans dev à faire.
 
 ### Tâches
 
-- [ ] Installation de Prisma et `schema.prisma`
-- [ ] Première migration + contraintes SQL manuelles
-- [ ] Seed du compte admin
-- [ ] Healthcheck base de données
-- [ ] Service PostgreSQL dans la CI
-- [ ] Tests des contraintes
+- [x] Installation de Prisma et schema.prisma
+- [x] Première migration + contraintes SQL manuelles
+- [x] Seed du compte admin
+- [x] Healthcheck base de données
+- [x] Service PostgreSQL dans la CI
+- [x] Tests des contraintes
 
 ### Journal
 
-- 
+**2026-11-13**
+- Branche feature/lot-1-base-donnees, worktree isolé pour préserver le staging.
+- Branche créée depuis dev, puis avance rapide sur le socle lot 0 existant (dev ne le contenait pas encore).
+- Prisma, migration SQL, seed bcrypt idempotent, healthcheck DB et CI PostgreSQL.
+- 26 tests API réussis : contraintes, concurrence, fuseau Paris, seed et healthcheck.
+- Installation avec npm ci, migrations réappliquées sans changement, lint sans erreur et build web validés.
+- Guide d'utilisation : [docs/LOT1.md](docs/LOT1.md).
+- Le statut du lot 0 reste inchangé : protection des branches et intégration à vérifier.
 
 ---
 

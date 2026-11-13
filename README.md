@@ -29,8 +29,8 @@ Projet réalisé dans le cadre du cours CI/CD : l'accent est mis sur le découpa
 
 ```
 coursCI-CD/
-├── api/              # API Express (à venir, lot 0)
-├── web/              # Front React (à venir, lot 0)
+├── api/              # API Express + Prisma
+├── web/              # Front React
 ├── docs/
 │   ├── SPEC.md          # Spécifications fonctionnelles
 │   ├── ARCHITECTURE.md  # Architecture technique
@@ -45,10 +45,14 @@ coursCI-CD/
 
 ```bash
 cp .env.example .env
-docker compose up -d        # API + PostgreSQL
-npm install
-npm run dev                 # API sur :3000, front sur :5173
-npm test
+docker compose up -d db     # PostgreSQL
+npm ci
+npm run db:generate
+npm run db:migrate
+npm run dev --workspace=api # API sur :3000
+# Dans un autre terminal : npm run dev --workspace=web
+
+# Tests sur une base dédiée : voir docs/LOT1.md
 ```
 
 ## Workflow git
@@ -62,3 +66,5 @@ Messages de commit au format [Conventional Commits](https://www.conventionalcomm
 ## Documentation
 
 Voir le dossier [docs/](docs/) et le [journal de bord](journal.md).
+
+Guide base de données : [lot 1](docs/LOT1.md).

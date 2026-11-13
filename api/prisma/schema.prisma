@@ -1,0 +1,69 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  PATIENT
+  ADMIN
+
+  @@map("role")
+}
+
+enum AppointmentStatus {
+  BOOKED
+  CANCELLED
+
+  @@map("appointment_status")
+}
+
+enum CancelledBy {
+  PATIENT
+  ADMIN
+
+  @@map("cancelled_by")
+}
+
+model User {
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email        String        @unique @db.VarChar(255)
+  passwordHash String        @map("password_hash") @db.VarChar(255)
+  firstName    String        @map("first_name") @db.VarChar(100)
+  lastName     String        @map("last_name") @db.VarChar(100)
+  phone        String        @db.VarChar(20)
+  role         Role          @default(PATIENT)
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  appointments Appointment[]
+
+  @@map("users")
+}
+
+model Appointment {
+  id          String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String            @map("user_id") @db.Uuid
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startAt     DateTime          @map("start_at") @db.Timestamptz(6)
+  endAt       DateTime          @map("end_at") @db.Timestamptz(6)
+  status      AppointmentStatus @default(BOOKED)
+  reason      String?           @db.VarChar(500)
+  cancelledAt DateTime?         @map("cancelled_at") @db.Timestamptz(6)
+  cancelledBy CancelledBy?      @map("cancelled_by")
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId, startAt], map: "appointments_user_start_idx")
+  @@map("appointments")
+}
+
+model ClosedDay {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  date      DateTime @unique @db.Date
+  reason    String?  @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("closed_days")
+}

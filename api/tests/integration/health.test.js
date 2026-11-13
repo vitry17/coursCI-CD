@@ -1,11 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { afterAll, describe, it, expect } from 'vitest';
 import request from 'supertest';
 import app from '../../src/app.js';
-
+import { prisma } from '../../src/lib/prisma.js';
+afterAll(() => prisma.$disconnect());
 describe('GET /api/health', () => {
-  it('returns status ok', async () => {
+  it('vérifie la connexion PostgreSQL', async () => {
     const res = await request(app).get('/api/health');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ status: 'ok' });
+    expect(res.body).toEqual({ status: 'ok', db: 'ok' });
   });
 });
