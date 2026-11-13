@@ -187,3 +187,15 @@ Statuts : ⬜ À faire · 🟨 En cours · ✅ Terminé
 ### Journal
 
 - 
+
+## Reprise du staging avec Supabase — 2026-11-13
+
+- Branche feature/staging-supabase créée depuis dev.
+- Serveur MCP Supabase configuré pour bognyfqwmkiuxyyzxlie et OAuth confirmé.
+- DIRECT_URL réservée au CLI Prisma, DATABASE_URL conservée pour l'API.
+- Client Prisma généré à l'installation et moteur Vercel inclus dans le bundle.
+- Migrations automatiques limitées à dev/Preview ; autres branches inchangées.
+- RLS activée sur les tables applicatives pour bloquer les accès publics Supabase.
+- 31 tests API, lint sans erreur, build web, simulation du build staging et Docker validés.
+- À terminer : charger les outils MCP dans la session, connecter Vercel, inspecter
+  Supabase, définir les variables de staging et vérifier le déploiement distant.

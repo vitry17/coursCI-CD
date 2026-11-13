@@ -1,94 +1,102 @@
-# Staging & déploiement (Vercel)
+# Staging Vercel + Supabase
 
-Ce document décrit comment le projet **naturo-rdv** est déployé, avec un
-environnement de **staging** (recette) distinct de la **production**.
+## État et architecture
 
-## Principe : CI ≠ CD
+- Dépôt : vitry17/coursCI-CD.
+- Projet Vercel existant : courscicd, équipe projet-ci-cd.
+- Projet Supabase choisi pour le staging : bognyfqwmkiuxyyzxlie.
+- main correspond à la production ; dev au staging (Preview Vercel).
+- Les branches feature/* ont des previews indépendantes.
+- React est servi depuis web/dist ; Express via api/index.js.
+- Le front appelle /api/health sur la même origine, sans clé Supabase publique.
+- Prisma reste le seul accès aux tables applicatives depuis le serveur.
 
-On sépare les deux rôles pour ne rien dupliquer :
+Le serveur MCP Supabase sert à administrer le projet. Son authentification OAuth
+ne configure pas la connexion PostgreSQL utilisée par l'application.
 
-| Outil              | Rôle | Quand                              |
-| ------------------ | ---- | ---------------------------------- |
-| **GitHub Actions** | CI   | lint + tests + build de vérif      |
-| **Vercel**         | CD   | déploie automatiquement à chaque push |
+## Connexions Supabase
 
-> GitHub Actions ne déploie rien, Vercel ne relit pas la qualité du code.
-> GitHub = qualité du code, Vercel = livraison.
+Dans Supabase → Connect, récupérer les deux URL du projet :
 
-GitHub Actions est **gratuit** ici car le dépôt est **public** (runners
-standard illimités). Vercel est utilisé en plan **Hobby** (gratuit,
-usage non-commercial — OK pour un projet d'école).
+| Variable | Usage | Connexion |
+| --- | --- | --- |
+| DATABASE_URL | API serverless | Transaction pooler, port 6543 |
+| DIRECT_URL | Migrations Prisma | Session pooler, port 5432 |
 
-## Modèle de branches → environnements
+Exemples de structure (remplacer HOST par l'hôte exact affiché dans Supabase,
+ne pas deviner la région ; encoder les caractères spéciaux du mot de passe) :
 
-| Branche      | Environnement Vercel     | URL                                   |
-| ------------ | ------------------------ | ------------------------------------- |
-| `main`       | **Production**           | URL stable de prod                    |
-| `dev`        | **Staging** (preview)    | URL stable de staging                 |
-| `feature/*`  | **Preview** (éphémère)   | 1 URL générée automatiquement par PR  |
+```dotenv
+DATABASE_URL=postgresql://postgres.bognyfqwmkiuxyyzxlie:PASSWORD@HOST:6543/postgres?pgbouncer=true&connection_limit=1&sslmode=require
+DIRECT_URL=postgresql://postgres.bognyfqwmkiuxyyzxlie:PASSWORD@HOST:5432/postgres?sslmode=require
+```
 
-Flux : `feature/*` → PR (preview + CI verte) → merge dans `dev` (staging) →
-merge `dev` → `main` (production).
+Le pooler session est utilisable en IPv4 pour les migrations.
+Le script Prisma utilise DIRECT_URL si elle est définie, sinon DATABASE_URL
+pour rester compatible avec PostgreSQL local et la CI.
+Le client API continue d'utiliser DATABASE_URL.
 
-## Architecture de déploiement (Pattern A : tout sur Vercel)
+Références : [Supabase / Prisma](https://www.prisma.io/docs/orm/v6/overview/databases/supabase)
+et [diagnostic Supabase Prisma](https://supabase.com/docs/guides/database/prisma/prisma-troubleshooting).
 
-Le front (Vite/React) **et** l'API (Express) sont servis par **un seul projet
-Vercel**, sur la **même origine** :
+## Configuration Vercel
 
-- le front statique est servi depuis `web/dist` ;
-- l'API Express tourne en **fonction serverless** via `api/index.js`, exposée
-  sous `/api/*`.
+Dans le projet existant, conserver la racine du dépôt et main comme branche
+de production. Définir DATABASE_URL et DIRECT_URL pour **Preview, branche dev**.
+Ne pas réutiliser ces secrets pour la production ou les previews des autres branches.
 
-Tout est configuré dans [`vercel.json`](../vercel.json) :
+Le dépôt prépare :
+1. npm postinstall génère le client Prisma à chaque installation.
+2. Le moteur rhel-openssl-3.0.x est généré et inclus dans le bundle API.
+3. Le script vercel-build du front applique prisma migrate deploy uniquement
+   lorsque VERCEL=1, VERCEL_ENV=preview et VERCEL_GIT_COMMIT_REF=dev.
+4. Le build staging échoue si DIRECT_URL manque ou si une migration échoue.
+5. Les previews feature/* et la production ne déclenchent pas ces migrations.
+6. Vite construit le front.
 
-- `@vercel/static-build` construit `web/` → `web/dist` ;
-- `@vercel/node` empaquette `api/index.js` (qui réutilise `api/src/app.js`) ;
-- les `routes` envoient `/api/*` vers la fonction, le reste vers le front.
+Ne pas utiliser prisma db push ou migrate reset pour initialiser Supabase :
+les migrations SQL versionnées contiennent les CHECK et l'index partiel.
 
-Comme front et API partagent la même origine, **aucune variable `VITE_API_URL`
-n'est nécessaire** et **CORS est inutile** entre les deux : le front appelle
-simplement `/api/...` (voir `web/src/App.jsx` qui lit `/api/health`). Le proxy
-Vite (`web/vite.config.js`) fait la même chose en local.
+Le seed administrateur reste une action explicite, jamais une étape de build.
+Configurer ADMIN_EMAIL et ADMIN_PASSWORD puis lancer npm run db:seed avec la
+connexion du staging uniquement quand la base est prête. Aucun mot de passe
+par défaut n'est créé.
 
-## Mise en place côté Vercel (à faire une fois, dans le dashboard)
+## Accès aux tables
 
-Ces étapes se font sur https://vercel.com (je ne peux pas les faire à ta place) :
+La migration 20261113010000_enable_rls active RLS sur les trois tables.
+Aucune policy publique n'est créée : les rôles anon/authenticated de l'API
+Supabase ne peuvent pas lire les patients ni les hachages de mots de passe.
+La connexion Prisma doit utiliser le propriétaire des tables ou un rôle serveur
+autorisé à contourner RLS. Les règles d'authentification de l'application
+restent dans Express (lot 2).
 
-1. **Add New… → Project** → importer le dépôt `vitry17/coursCI-CD`.
-2. **Root Directory** : laisser la **racine du dépôt** (c'est `vercel.json` qui
-   pilote le build, pas un sous-dossier).
-3. **Framework Preset** : `Other` (la config vient de `vercel.json`).
-4. **Settings → Git → Production Branch** : `main`.
-5. **Deploy**. Vercel crée l'URL de production (branche `main`) et génère une
-   URL de preview pour chaque autre branche / PR.
+Voir [RLS Supabase](https://supabase.com/docs/guides/database/postgres/row-level-security).
 
-### Variables d'environnement
+## Validation après déploiement
 
-À définir dans **Settings → Environment Variables**, en les **cloisonnant par
-environnement** (Production vs Preview) — ne jamais mettre les secrets de prod
-en staging :
+```sh
+curl --fail https://URL-STAGING/api/health
+```
 
-| Variable        | Prod | Preview/Staging | Remarque                               |
-| --------------- | ---- | --------------- | -------------------------------------- |
-| `DATABASE_URL`  | ✅   | ✅ (autre base) | quand une vraie base sera branchée     |
-| `JWT_SECRET`    | ✅   | ✅ (différent)  | secret distinct par environnement      |
-| `CORS_ORIGIN`   | —    | —               | inutile en Pattern A (same-origin)     |
+Réponse attendue : HTTP 200 avec {"status":"ok","db":"ok"}.
+HTTP 503 avec {"status":"error","db":"error"} signifie que la connexion DB
+est indisponible. Ce healthcheck vérifie la connexion, pas la présence des tables :
+la réussite de migrate deploy doit aussi être vérifiée dans les logs du build.
 
-Tant que l'API n'a que `/api/health`, aucune variable n'est obligatoire.
+La CI GitHub conserve sa propre base PostgreSQL éphémère. Elle n'utilise jamais
+la base Supabase et ne déploie pas sur Vercel.
 
-## Tester que ça marche
+## Reprise du raccordement
 
-- **En local** : `npm run dev` (lance front + API), ouvrir http://localhost:5173
-  → la page doit afficher « API : ok » (le front appelle `/api/health` via le
-  proxy Vite).
-- **En preview/staging** : ouvrir l'URL Vercel de la branche → même affichage
-  « API : ok », ce qui prouve que la fonction serverless répond.
-- **Endpoint direct** : `https://<url-vercel>/api/health` doit renvoyer
-  `{"status":"ok"}`.
+Le code peut être validé localement sans accès aux comptes externes.
+Pour finaliser le staging, il reste à inspecter le projet Supabase, configurer
+les deux URL dans Vercel, déployer dev puis vérifier le healthcheck distant.
+Ces opérations ne sont pas attestées par une simple authentification MCP.
+## Validation locale du raccordement — 13 novembre 2026
 
-## Évolutions possibles
-
-- Ajouter un test front (Vitest) sur le composant `App` (ex. mock de `fetch`).
-- Si l'API devient un vrai serveur long-running (websockets, jobs), envisager
-  le **Pattern B** : front sur Vercel + API conteneurisée (le `Dockerfile`
-  existe déjà) sur un hébergeur dédié.
+31 tests API réussis, dont l'isolation RLS et le contrôle des migrations par
+branche. Installation npm ci, lint sans erreur, build web et image Docker validés.
+Le build staging a été simulé avec une DATABASE_URL invalide et une DIRECT_URL
+locale valide : migrations et build réussis, confirmant le choix de connexion.
+La base Supabase distante et les variables Vercel restent à configurer.
