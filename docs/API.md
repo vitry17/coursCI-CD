@@ -75,9 +75,9 @@ Utilisé par la CI et le déploiement.
 - `200` : `{ "user": { ... } }` et cookie posé.
 - `401` : identifiants invalides (même message que l'email existe ou non).
 
-### `POST /api/auth/logout` (patient)
+### `POST /api/auth/logout` (public, idempotent)
 
-- `204` : cookie supprimé.
+- `204` : cookie supprimé, même si la session est absente ou expirée.
 
 ### `GET /api/auth/me` (patient)
 
@@ -108,7 +108,7 @@ Champs modifiables : `firstName`, `lastName`, `phone`.
 
 Supprime le compte et ses rendez-vous (R11). Interdit pour le compte admin.
 
-- `204`, cookie supprimé.
+- `204`, cookie supprimé, même si la session est absente ou expirée.
 
 ---
 
@@ -214,3 +214,18 @@ Liste des mercredis fermés à venir.
 ### `DELETE /api/admin/closed-days/:id` (admin)
 
 Rouvre le mercredi. `204`.
+
+## Précisions de sécurité du lot 2
+
+- Les réponses d'authentification portent Cache-Control: no-store.
+- JWT HS256 uniquement, expiration et identifiant utilisateur obligatoires ; le rôle est relu en base à chaque requête protégée.
+- JWT_SECRET doit être aléatoire, contenir au moins 32 octets et différer de la valeur exemple. L'API refuse de démarrer sinon. Génération : node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))".
+- Validation Zod : email normalisé, mot de passe de 8 caractères minimum avec lettre et chiffre, limité à 72 octets UTF-8 pour éviter la troncature bcrypt.
+- Deux inscriptions concurrentes avec le même email donnent 201 et 409 EMAIL_TAKEN.
+- Connexion : 10 requêtes par IP et par fenêtre de 15 minutes, puis 429 TOO_MANY_REQUESTS et Retry-After. Limitation active aussi pendant les tests.
+- Le store du limiteur est en mémoire par instance. Un store partagé ou une règle de pare-feu adaptée est requis avant une ouverture en production multi-instance ; le staging reste protégé par Vercel.
+- Sur Vercel seulement, Express fait confiance au proxy de la plateforme, qui réécrit X-Forwarded-For ([documentation](https://vercel.com/docs/headers/request-headers#x-forwarded-for)). En local, les en-têtes proxy du client ne sont pas fiables.
+- Déconnexion : effacement du cookie navigateur, pas de révocation serveur des JWT déjà copiés ; ils restent valides jusqu'à expiration. La suppression du compte invalide immédiatement l'accès grâce à la relecture en base.
+- JSON malformé : 400 VALIDATION_ERROR. Corps trop volumineux : 413 PAYLOAD_TOO_LARGE.
+
+Vérifications des bibliothèques : [JWT](https://github.com/auth0/node-jsonwebtoken), [Zod](https://zod.dev/api), [limiteur](https://express-rate-limit.mintlify.app/reference/configuration).

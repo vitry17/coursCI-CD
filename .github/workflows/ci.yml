@@ -23,17 +23,20 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://naturo:naturo@localhost:5432/naturo_test
+      JWT_SECRET: test-only-secret-with-at-least-32-bytes
     steps:
       - uses: actions/checkout@v4
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
       - name: Install dependencies
         run: npm ci
       - name: Generate Prisma client
         run: npm run db:generate
+      - name: Prepare server roles for integration tests
+        run: psql postgresql://naturo:naturo@localhost:5432/naturo_test -v ON_ERROR_STOP=1 -f api/tests/fixtures/database-roles.sql
       - name: Apply migrations
         run: npm run db:migrate
       - name: Lint
