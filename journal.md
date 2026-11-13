@@ -226,4 +226,11 @@ Statuts : ⬜ À faire · 🟨 En cours · ✅ Terminé
 - Aucun changement du schéma ou des données du staging. Les trois migrations existantes et les droits du rôle applicatif sont couverts par les tests.
 - Limites documentées dans docs/API.md : compteurs de limitation par instance et absence de révocation serveur à la déconnexion.
 - Audit des dépendances : alerte préexistante sur deepmerge-ts via Prisma 6 ; la migration majeure Prisma est à traiter séparément.
-- Fusion dans dev et validation CI finale à effectuer après intégration des corrections à la PR #4.
+- PR #4 fusionnée dans dev (1dc62e3) ; CI du merge réussie, exécution 43418124089.
+
+## 2026-11-13 — Préparation du rendu
+
+- README corrigé pour séparer les lots réalisés des fonctionnalités prévues et signaler que le staging est protégé.
+- Ajout du badge CI, des liens vers les preuves GitHub et des consignes de configuration de JWT_SECRET.
+- Guide local actualisé pour Node.js 24 et les tests du lot 2.
+- Livraison préparée depuis dev vers main par PR ; la production reste distincte du staging.
