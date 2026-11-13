@@ -1,20 +1,31 @@
-import { useEffect, useState } from 'react';
+import { Routes, Route } from 'react-router-dom';
+import { NavBar } from './components/NavBar.jsx';
+import { ProtectedRoute } from './components/ProtectedRoute.jsx';
+import { Home } from './pages/Home.jsx';
+import { Login } from './pages/Login.jsx';
+import { Register } from './pages/Register.jsx';
+import { Account } from './pages/Account.jsx';
 
 function App() {
-  const [apiStatus, setApiStatus] = useState('…');
-
-  useEffect(() => {
-    fetch('/api/health')
-      .then((res) => res.json())
-      .then((data) => setApiStatus(data.status ?? 'inconnu'))
-      .catch(() => setApiStatus('injoignable'));
-  }, []);
-
   return (
-    <main>
-      <h1>Naturo RDV — application en construction</h1>
-      <p>API&nbsp;: {apiStatus}</p>
-    </main>
+    <>
+      <NavBar />
+      <main>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route
+            path="/compte"
+            element={
+              <ProtectedRoute>
+                <Account />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </main>
+    </>
   );
 }
 
