@@ -3,6 +3,24 @@ import js from '@eslint/js';
 export default [
   js.configs.recommended,
   {
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: {
+        // Node (api)
+        process: 'readonly',
+        console: 'readonly',
+        // Navigateur (web)
+        document: 'readonly',
+        window: 'readonly',
+        fetch: 'readonly',
+        // Communs
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+      },
+    },
     rules: {
       'no-unused-vars': 'warn',
       'no-console': 'off',
