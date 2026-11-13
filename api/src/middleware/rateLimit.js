@@ -1,28 +1,18 @@
-import { AppError } from '../lib/errors.js';
+import { rateLimit } from 'express-rate-limit';
 
-// Limiteur en mémoire minimal (sans dépendance) pour /auth/login.
-// Désactivé en test pour ne pas gêner les suites d'intégration.
+// Compteurs par instance : prévoir un store partagé avant une mise en production
+// sur plusieurs instances. Le limiteur reste actif pendant les tests.
 export function createRateLimit({ windowMs, max }) {
-  const hits = new Map();
-  return (req, _res, next) => {
-    if (process.env.NODE_ENV === 'test') return next();
-    const key = req.ip || 'unknown';
-    const now = Date.now();
-    const record = hits.get(key);
-    if (!record || now > record.reset) {
-      hits.set(key, { count: 1, reset: now + windowMs });
-      return next();
-    }
-    record.count += 1;
-    if (record.count > max) {
-      return next(
-        new AppError(
-          429,
-          'TOO_MANY_REQUESTS',
-          'Trop de tentatives, réessayez plus tard.'
-        )
-      );
-    }
-    next();
-  };
+  return rateLimit({
+    windowMs,
+    limit: max,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    message: {
+      error: {
+        code: 'TOO_MANY_REQUESTS',
+        message: 'Trop de tentatives, réessayez plus tard.',
+      },
+    },
+  });
 }

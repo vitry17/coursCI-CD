@@ -1,44 +1,34 @@
-// Validation des entrées sans dépendance (règles de SPEC.md).
+import { Buffer } from 'node:buffer';
+import { z } from 'zod';
 import { Errors } from './errors.js';
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_RE = /^[0-9+().\s-]{6,20}$/;
+const email = z.string().trim().toLowerCase().max(255).email('Email invalide.');
+const password = z.string().min(1, 'Mot de passe requis.').refine(
+  (value) => Buffer.byteLength(value, 'utf8') <= 72,
+  'Le mot de passe ne doit pas dépasser 72 octets UTF-8.'
+);
+const registerSchema = z.object({
+  firstName: z.string().trim().min(1, 'Prénom requis.').max(100),
+  lastName: z.string().trim().min(1, 'Nom requis.').max(100),
+  email,
+  phone: z.string().trim().regex(/^[0-9+().\s-]{6,20}$/, 'Téléphone invalide.'),
+  password: password.refine(
+    (value) => value.length >= 8 && /[A-Za-z]/.test(value) && /\d/.test(value),
+    '8 caractères minimum, avec au moins une lettre et un chiffre.'
+  ),
+});
+const loginSchema = z.object({ email, password });
 
-const str = (value) => (typeof value === 'string' ? value.trim() : '');
-
-export function validateRegister(body) {
-  const details = [];
-  const firstName = str(body?.firstName);
-  const lastName = str(body?.lastName);
-  const email = str(body?.email).toLowerCase();
-  const phone = str(body?.phone);
-  const password = typeof body?.password === 'string' ? body.password : '';
-
-  if (!firstName || firstName.length > 100)
-    details.push({ field: 'firstName', message: 'Prénom requis (100 caractères max).' });
-  if (!lastName || lastName.length > 100)
-    details.push({ field: 'lastName', message: 'Nom requis (100 caractères max).' });
-  if (!EMAIL_RE.test(email) || email.length > 255)
-    details.push({ field: 'email', message: 'Email invalide.' });
-  if (!PHONE_RE.test(phone))
-    details.push({ field: 'phone', message: 'Téléphone invalide.' });
-  // R10 : 8 caractères minimum, au moins une lettre et un chiffre.
-  if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password))
-    details.push({
-      field: 'password',
-      message: '8 caractères minimum, avec au moins une lettre et un chiffre.',
-    });
-
-  if (details.length) throw Errors.validation(details);
-  return { firstName, lastName, email, phone, password };
+function validate(schema, body) {
+  const result = schema.safeParse(body);
+  if (!result.success) {
+    throw Errors.validation(result.error.issues.map((issue) => ({
+      field: issue.path.join('.'),
+      message: issue.message,
+    })));
+  }
+  return result.data;
 }
 
-export function validateLogin(body) {
-  const details = [];
-  const email = str(body?.email).toLowerCase();
-  const password = typeof body?.password === 'string' ? body.password : '';
-  if (!email) details.push({ field: 'email', message: 'Email requis.' });
-  if (!password) details.push({ field: 'password', message: 'Mot de passe requis.' });
-  if (details.length) throw Errors.validation(details);
-  return { email, password };
-}
+export const validateRegister = (body) => validate(registerSchema, body);
+export const validateLogin = (body) => validate(loginSchema, body);

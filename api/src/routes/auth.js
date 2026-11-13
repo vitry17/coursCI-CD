@@ -59,8 +59,8 @@ router.post(
   })
 );
 
-// POST /api/auth/logout (connecté)
-router.post('/logout', requireAuth, (_req, res) => {
+// POST /api/auth/logout : idempotent, même après expiration.
+router.post('/logout', (_req, res) => {
   res.clearCookie(TOKEN_COOKIE, { ...cookieOptions, maxAge: undefined });
   res.status(204).end();
 });

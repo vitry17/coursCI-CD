@@ -106,3 +106,44 @@ describe('GET /api/auth/me et logout', () => {
     expect(after.status).toBe(401);
   });
 });
+
+
+describe('Régressions de la revue du lot 2', () => {
+  it('traite deux inscriptions simultanées comme une création et un conflit', async () => {
+    const user = validUser();
+    const responses = await Promise.all([
+      request(app).post('/api/auth/register').send(user),
+      request(app).post('/api/auth/register').send(user),
+    ]);
+    expect(responses.map((res) => res.status).sort()).toEqual([201, 409]);
+    expect(responses.find((res) => res.status === 409).body.error.code).toBe('EMAIL_TAKEN');
+  });
+
+  it('déconnecte même avec une session absente ou invalide', async () => {
+    const res = await request(app).post('/api/auth/logout').set('Cookie', 'token=expired');
+    expect(res.status).toBe(204);
+    expect(res.headers['set-cookie'].join(';')).toContain('Expires=Thu, 01 Jan 1970');
+    expect((await request(app).post('/api/auth/logout')).status).toBe(204);
+  });
+
+  it('répond 401 pour un cookie mal encodé et 400 pour du JSON invalide', async () => {
+    expect((await request(app).get('/api/auth/me').set('Cookie', 'token=%ZZ')).status).toBe(401);
+    const res = await request(app).post('/api/auth/register')
+      .set('Content-Type', 'application/json').send('{"invalid":');
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('ignore le rôle demandé et recharge les droits depuis la base', async () => {
+    const agent = request.agent(app);
+    const res = await agent.post('/api/auth/register').send(validUser({ role: 'ADMIN' }));
+    expect(res.body.user.role).toBe('PATIENT');
+    expect(res.headers['set-cookie'].join(';')).toContain('HttpOnly');
+    expect(res.headers['set-cookie'].join(';')).toContain('SameSite=Lax');
+    expect(res.headers['cache-control']).toBe('no-store');
+    await prisma.user.update({ where: { id: res.body.user.id }, data: { role: 'ADMIN' } });
+    expect((await agent.get('/api/auth/me')).body.user.role).toBe('ADMIN');
+    await prisma.user.delete({ where: { id: res.body.user.id } });
+    expect((await agent.get('/api/auth/me')).status).toBe(401);
+  });
+});

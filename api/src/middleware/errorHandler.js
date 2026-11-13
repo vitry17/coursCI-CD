@@ -1,15 +1,22 @@
-import { AppError } from '../lib/errors.js';
+import { AppError, Errors } from '../lib/errors.js';
 
-// Route inconnue sous /api -> 404 au format commun.
 export function notFound(_req, res) {
   res.status(404).json({
     error: { code: 'NOT_FOUND', message: 'Ressource introuvable.' },
   });
 }
 
-// Middleware d'erreurs final (4 arguments obligatoires pour Express).
 // eslint-disable-next-line no-unused-vars
 export function errorHandler(err, _req, res, _next) {
+  if (err?.code === 'P2002' && err.meta?.target?.includes('email')) {
+    err = Errors.emailTaken();
+  }
+  if (err?.type === 'entity.parse.failed') {
+    err = Errors.validation([{ field: 'body', message: 'JSON invalide.' }]);
+  }
+  if (err?.type === 'entity.too.large') {
+    err = new AppError(413, 'PAYLOAD_TOO_LARGE', 'Requête trop volumineuse.');
+  }
   if (err instanceof AppError) {
     const body = { error: { code: err.code, message: err.message } };
     if (err.details) body.error.details = err.details;

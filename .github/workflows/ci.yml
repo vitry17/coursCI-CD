@@ -23,6 +23,7 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://naturo:naturo@localhost:5432/naturo_test
+      JWT_SECRET: test-only-secret-with-at-least-32-bytes
     steps:
       - uses: actions/checkout@v4
       - name: Setup Node.js
