@@ -34,4 +34,10 @@ export const api = {
   logout: () => request('/auth/logout', { method: 'POST' }),
   updateMe: (body) => request('/users/me', { method: 'PATCH', body }),
   deleteMe: () => request('/users/me', { method: 'DELETE' }),
+  slots: () => request('/slots'),
+  book: (body) => request('/appointments', { method: 'POST', body }),
+  myAppointments: (scope = 'upcoming') =>
+    request(`/appointments/me?scope=${scope}`),
+  cancelAppointment: (id) =>
+    request(`/appointments/${id}/cancel`, { method: 'PATCH' }),
 };

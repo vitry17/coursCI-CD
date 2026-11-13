@@ -27,6 +27,8 @@ export function NavBar() {
       <nav aria-label="Navigation principale">
         {user ? (
           <>
+            <Link to="/reserver">Réserver</Link>
+            <Link to="/mes-rendez-vous">Mes rendez-vous</Link>
             <Link to="/compte">Mon compte</Link>
             <button type="button" className="link-button" onClick={handleLogout} disabled={submitting}>
               Déconnexion
