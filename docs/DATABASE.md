@@ -100,7 +100,7 @@ ALTER TABLE appointments ADD CONSTRAINT appointments_cancel_ck
 CREATE INDEX appointments_user_start_idx ON appointments (user_id, start_at);
 ```
 
-Prisma ne sait pas déclarer les index partiels et les `CHECK` : ils sont ajoutés à la main dans le fichier SQL de la migration.
+La version Prisma 6 utilisée ici ne sait pas déclarer les index partiels et les `CHECK` : ils sont ajoutés à la main dans le fichier SQL de la migration.
 
 La règle R4 (un rendez-vous par mercredi et par patient) est vérifiée dans le service, à l'intérieur d'une transaction.
 
@@ -122,8 +122,10 @@ La règle R4 (un rendez-vous par mercredi et par patient) est vérifiée dans le
 ## 5. Données initiales (seed)
 
 - Un utilisateur `ADMIN` créé à partir de `ADMIN_EMAIL` / `ADMIN_PASSWORD`. Le seed est idempotent (upsert).
-- En développement uniquement : quelques patients et rendez-vous de démonstration.
+- Les données de démonstration ne sont pas incluses dans le lot 1.
 
 ## 6. Base de test
 
-La CI utilise une base PostgreSQL éphémère. Avant les tests d'intégration : `prisma migrate deploy`, puis les tables sont vidées entre chaque fichier de test.
+La CI utilise une base PostgreSQL éphémère. Avant les tests d'intégration : `prisma migrate deploy`, puis chaque test nettoie uniquement les données qu’il a créées. Le nom de la base de test doit finir par `_test`.
+
+Commandes et configuration : [guide du lot 1](LOT1.md).

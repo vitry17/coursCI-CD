@@ -2,12 +2,19 @@
   "name": "naturo-rdv",
   "private": true,
   "type": "module",
-  "workspaces": ["api", "web"],
+  "workspaces": [
+    "api",
+    "web"
+  ],
   "scripts": {
     "dev": "npm run dev --workspaces --if-present",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present"
+    "lint": "npm run lint --workspaces --if-present",
+    "db:generate": "npm run db:generate --workspace=api",
+    "db:migrate": "npm run db:migrate --workspace=api",
+    "db:migrate:dev": "npm run db:migrate:dev --workspace=api",
+    "db:seed": "npm run db:seed --workspace=api"
   },
   "engines": {
     "node": ">=20"

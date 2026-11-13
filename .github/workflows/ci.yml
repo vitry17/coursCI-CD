@@ -1,31 +1,44 @@
 name: CI
-
 on:
   push:
     branches: [dev, main]
   pull_request:
     branches: [dev, main]
-
 jobs:
   ci:
     runs-on: ubuntu-latest
-
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: naturo
+          POSTGRES_PASSWORD: naturo
+          POSTGRES_DB: naturo_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U naturo -d naturo_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://naturo:naturo@localhost:5432/naturo_test
     steps:
       - uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-
+          cache: npm
       - name: Install dependencies
-        run: npm install
-
+        run: npm ci
+      - name: Generate Prisma client
+        run: npm run db:generate
+      - name: Apply migrations
+        run: npm run db:migrate
       - name: Lint
         run: npm run lint
-
       - name: Test
-        run: npm run test
-
+        run: npm test
       - name: Build web
         run: npm run build --workspace=web
