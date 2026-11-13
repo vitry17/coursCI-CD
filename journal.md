@@ -216,3 +216,14 @@ Statuts : ⬜ À faire · 🟨 En cours · ✅ Terminé
 - URL : https://courscicd-git-dev-projet-ci-cd.vercel.app (authentification Vercel conservée).
 - Smoke tests réels : /api/health répond 200 avec status=ok et db=ok ; page d'accueil 200.
 - Accès temporaire de validation révoqué après les vérifications.
+
+## 2026-11-13 — Lot 2 : authentification et revue
+
+- Implémentation de la PR #4 : inscription, connexion, déconnexion, utilisateur courant, autorisations ADMIN, pages React et routes protégées.
+- Revue et corrections dans fix/lot-2-auth : bibliothèques JWT/cookies/limitation maintenues, validation Zod, configuration du secret obligatoire, expiration stricte, plafond bcrypt en octets, conflit d'inscription concurrente et déconnexion idempotente.
+- Le front affiche une erreur en cas d'échec réseau à la déconnexion. Ajout de tests de navigation, restauration de session et erreurs d'inscription.
+- Validation locale sur PostgreSQL 16 isolé : 51 tests API et 3 tests front réussis ; lint sans erreur et build web réussi.
+- Aucun changement du schéma ou des données du staging. Les trois migrations existantes et les droits du rôle applicatif sont couverts par les tests.
+- Limites documentées dans docs/API.md : compteurs de limitation par instance et absence de révocation serveur à la déconnexion.
+- Audit des dépendances : alerte préexistante sur deepmerge-ts via Prisma 6 ; la migration majeure Prisma est à traiter séparément.
+- Fusion dans dev et validation CI finale à effectuer après intégration des corrections à la PR #4.
