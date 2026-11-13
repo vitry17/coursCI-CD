@@ -34,6 +34,22 @@ const profileUpdateSchema = z
     message: 'Au moins un champ à modifier est requis.',
   });
 
+// Réservation (lot 4).
+const isoInstant = z
+  .string()
+  .refine((value) => !Number.isNaN(new Date(value).getTime()), 'Date invalide.');
+const bookingSchema = z.object({
+  startAt: isoInstant,
+  reason: z.string().trim().max(500, 'Motif trop long (500 caractères max).').optional(),
+});
+const dateOnly = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date attendue au format AAAA-MM-JJ.');
+const slotsQuerySchema = z.object({
+  from: dateOnly.optional(),
+  to: dateOnly.optional(),
+});
+
 function validate(schema, body) {
   const result = schema.safeParse(body);
   if (!result.success) {
@@ -48,3 +64,5 @@ function validate(schema, body) {
 export const validateRegister = (body) => validate(registerSchema, body);
 export const validateLogin = (body) => validate(loginSchema, body);
 export const validateProfileUpdate = (body) => validate(profileUpdateSchema, body);
+export const validateBooking = (body) => validate(bookingSchema, body);
+export const validateSlotsQuery = (query) => validate(slotsQuerySchema, query);
