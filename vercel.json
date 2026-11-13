@@ -2,17 +2,19 @@
   "version": 2,
   "builds": [
     {
-      "src": "web/package.json",
+      "src": "package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "dist"
+        "distDir": "web/dist"
       }
     },
     {
       "src": "api/index.js",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": ["node_modules/.prisma/client/**"]
+        "includeFiles": [
+          "node_modules/.prisma/client/**"
+        ]
       }
     }
   ],
