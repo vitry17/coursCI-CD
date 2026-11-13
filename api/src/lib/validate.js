@@ -19,6 +19,21 @@ const registerSchema = z.object({
 });
 const loginSchema = z.object({ email, password });
 
+// Mise à jour de profil (lot 3) : champs facultatifs, au moins un requis.
+const profileUpdateSchema = z
+  .object({
+    firstName: z.string().trim().min(1, 'Prénom requis.').max(100).optional(),
+    lastName: z.string().trim().min(1, 'Nom requis.').max(100).optional(),
+    phone: z
+      .string()
+      .trim()
+      .regex(/^[0-9+().\s-]{6,20}$/, 'Téléphone invalide.')
+      .optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, {
+    message: 'Au moins un champ à modifier est requis.',
+  });
+
 function validate(schema, body) {
   const result = schema.safeParse(body);
   if (!result.success) {
@@ -32,3 +47,4 @@ function validate(schema, body) {
 
 export const validateRegister = (body) => validate(registerSchema, body);
 export const validateLogin = (body) => validate(loginSchema, body);
+export const validateProfileUpdate = (body) => validate(profileUpdateSchema, body);
