@@ -126,3 +126,15 @@ l'interdiction du DDL et la protection du registre Prisma.
   [index inutilisé](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index).
 - Aucun compte administrateur par défaut : le seed nécessite un email et un
   mot de passe choisis explicitement et ne s'exécute jamais pendant le build.
+## Déploiement distant validé
+
+La PR #5 a été fusionnée dans dev (8eac434), avec CI et build Vercel verts.
+URL stable : https://courscicd-git-dev-projet-ci-cd.vercel.app
+
+Le 13 novembre 2026, tests HTTP authentifiés sur le déploiement de dev :
+- /api/health : HTTP 200, {"status":"ok","db":"ok"} ;
+- / : HTTP 200, page HTML React présente.
+
+La preview conserve Vercel Authentication : sans session Vercel, l'URL redirige
+vers la connexion. L'accès temporaire de vérification a été révoqué immédiatement
+après les tests. Aucun accès public ni contournement permanent n'a été ajouté.

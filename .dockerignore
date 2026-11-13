@@ -5,5 +5,6 @@
 .worktrees
 .env
 **/.env
-*.log.env.*
+*.log
+.env.*
 **/.env.*
