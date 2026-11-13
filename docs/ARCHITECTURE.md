@@ -15,7 +15,7 @@ Monorepo avec deux applications (`api/` et `web/`) gérées par les workspaces n
 
 | Besoin | Choix | Raison |
 |---|---|---|
-| API | Node.js 20 + Express | Simple, très répandu, facile à tester avec Supertest |
+| API | Node.js 24 + Express | Simple, très répandu, facile à tester avec Supertest |
 | ORM | Prisma | Schéma déclaratif, migrations versionnées, typage |
 | BDD | PostgreSQL 16 | Contraintes fortes (index uniques partiels, CHECK) |
 | Front | React + Vite | Build rapide, écosystème de tests |

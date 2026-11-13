@@ -2,7 +2,7 @@
 
 ## Démarrage local
 
-Depuis la racine du dépôt, avec Node.js 20 et Docker :
+Depuis la racine du dépôt, avec Node.js 24 et Docker :
 
 ```sh
 cp .env.example .env
@@ -59,6 +59,7 @@ docker run --rm -d --name naturo-lot1-test \
   -e POSTGRES_USER=naturo -e POSTGRES_PASSWORD=naturo \
   -e POSTGRES_DB=naturo_test -p 127.0.0.1:55432:5432 postgres:16-alpine
 export DATABASE_URL=postgresql://naturo:naturo@localhost:55432/naturo_test
+docker exec -i naturo-lot1-test psql -U naturo -d naturo_test -v ON_ERROR_STOP=1 < api/tests/fixtures/database-roles.sql
 npm run db:migrate
 npm run lint
 npm test

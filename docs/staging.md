@@ -60,7 +60,8 @@ provisionnement n'ont transmis que leurs vérificateurs SCRAM à PostgreSQL.
 
 ## Migrations et build
 
-1. npm postinstall génère le client Prisma.
+1. Le builder statique part du package.json racine pour installer les deux workspaces.
+   npm postinstall génère le client Prisma ; la sortie statique est web/dist.
 2. Le moteur rhel-openssl-3.0.x est inclus dans la fonction Vercel.
 3. Le script vercel-build applique prisma migrate deploy uniquement pour
    VERCEL=1, VERCEL_ENV=preview et VERCEL_GIT_COMMIT_REF=dev.
